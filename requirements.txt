@@ -1,0 +1,7 @@
+Django>=4.2,<6
+pandas>=2.0
+openpyxl>=3.0
+rapidfuzz>=3.0
+jellyfish>=1.0
+metaphone>=0.6
+openai>=1.0
