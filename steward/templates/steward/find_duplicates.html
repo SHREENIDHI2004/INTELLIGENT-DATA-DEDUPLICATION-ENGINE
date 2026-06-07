@@ -1,0 +1,274 @@
+{% extends 'steward/base.html' %} {% block title %}Find Duplicates{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">Find Duplicates</div>
+  <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+    Execute matching algorithms on your dataset ({{ rows }} records).
+  </p>
+
+  <div class="tabs" style="margin-bottom: 1.5rem;">
+    <a href="?tab=exact" class="tab {% if active_tab == 'exact' %}active{% endif %}" onclick="showLoader()">Exact Match</a>
+    <a href="?tab=fuzzy" class="tab {% if active_tab == 'fuzzy' %}active{% endif %}" onclick="showLoader()">Fuzzy Match</a>
+    <a href="?tab=combined" class="tab {% if active_tab == 'combined' %}active{% endif %}" onclick="showLoader()">Combined Match</a>
+    <a href="?tab=ai" class="tab {% if active_tab == 'ai' %}active{% endif %}" onclick="showLoader()">AI Smart Match</a>
+    <a href="?tab=predictive" class="tab {% if active_tab == 'predictive' %}active{% endif %}" onclick="showLoader()">Predictive Match</a>
+  </div>
+
+  <!-- EXACT MATCH PANEL -->
+  <div id="exact-panel" style="display: {% if active_tab == 'exact' %}block{% else %}none{% endif %};">
+    <form method="post" onsubmit="showLoader()" class="sub-card">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="find_exact" />
+      <h4 class="sub-card-header">Select Columns for Exact Matching</h4>
+      <div class="checkbox-grid">
+        {% for col in exact_column_objects %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="exact_columns" value="{{ col.name }}" {{ col.checked|yesno:"checked," }} />
+          {{ col.name }}
+        </label>
+        {% endfor %}
+      </div>
+      <div style="margin-top: 1rem;">
+        <button type="submit" class="btn-primary">Run Analysis</button>
+        {% if exact_groups %}
+        <button type="submit" name="action" value="remove_exact" class="btn-secondary">Clear All</button>
+        {% endif %}
+      </div>
+    </form>
+
+    {% if exact_groups %}
+    <div class="results-card">
+      <div class="results-header">
+        <h4 class="results-title">Results: {{ exact_groups|length }} Duplicate Groups Found</h4>
+        <div class="results-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_to_db" />
+            <input type="hidden" name="tab" value="exact" />
+            <button type="submit" class="btn-primary">Push to Records List</button>
+          </form>
+          <a href="{% url 'export_duplicates' 'exact' %}" class="btn-black no-loader">Export to CSV</a>
+        </div>
+      </div>
+      {% for group in exact_groups %}
+      <div class="scroll-container">
+        <div class="group-title">Group #{{ group.group_id }} ({{ group.indices|length }} records)</div>
+        <div class="preview-html">{{ group.preview_html|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- FUZZY MATCH PANEL -->
+  <div id="fuzzy-panel" style="display: {% if active_tab == 'fuzzy' %}block{% else %}none{% endif %};">
+    <form method="post" onsubmit="showLoader()" class="sub-card">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="find_fuzzy" />
+      <h4 class="sub-card-header">Step 1: Select Columns for Fuzzy Matching</h4>
+      <div class="checkbox-grid">
+        {% for col in string_column_objects %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="fuzzy_columns" value="{{ col.name }}" {{ col.checked|yesno:"checked," }} />
+          {{ col.name }}
+        </label>
+        {% endfor %}
+      </div>
+      <div style="display: flex; gap: 2rem; align-items: center; margin-top: 1rem;">
+        <div>
+          <label class="form-label">Threshold (0-100)</label>
+          <input type="number" name="threshold" value="85" min="50" max="100" class="form-input" style="width: 80px;" />
+        </div>
+        <div>
+          <label class="form-label">Algorithm</label>
+          <select name="algorithm" class="form-input">
+            <option value="rapidfuzz">RapidFuzz (Fast)</option>
+            <option value="levenshtein">Levenshtein</option>
+            <option value="jaro_winkler">Jaro-Winkler</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top: 1rem;">
+        <button type="submit" class="btn-primary">Run Fuzzy Match</button>
+      </div>
+    </form>
+
+    {% if fuzzy_groups %}
+    <div class="results-card">
+      <div class="results-header">
+        <h4 class="results-title">Results: {{ fuzzy_groups|length }} Potential Groups</h4>
+        <div class="results-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_to_db" />
+            <input type="hidden" name="tab" value="fuzzy" />
+            <button type="submit" class="btn-primary">Push to Records List</button>
+          </form>
+          <a href="{% url 'export_duplicates' 'fuzzy' %}" class="btn-black no-loader">Export to CSV</a>
+        </div>
+      </div>
+      {% for group in fuzzy_groups %}
+      <div class="scroll-container" style="border-left: 2px solid var(--primary-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div class="group-title" style="color: var(--primary-color);">Group #{{ group.group_id }} (Score: {{ group.similarity_score|floatformat:1 }}%)</div>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="merge_fuzzy" />
+            <input type="hidden" name="merge_fuzzy_indices" value="{{ group.indices|join:',' }}" />
+            <button type="submit" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Merge Now</button>
+          </form>
+        </div>
+        <div class="preview-html">{{ group.preview_html|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- COMBINED MATCH PANEL -->
+  <div id="combined-panel" style="display: {% if active_tab == 'combined' %}block{% else %}none{% endif %};">
+    <form method="post" onsubmit="showLoader()" class="sub-card">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="find_combined" />
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div>
+          <h4 class="sub-card-header" style="margin-bottom: 0.5rem;">Exact Columns</h4>
+          <div class="checkbox-grid">
+            {% for col in combined_column_objects %}
+            <label class="checkbox-label">
+              <input type="checkbox" name="combined_exact_columns" value="{{ col.name }}" />
+              {{ col.name }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div>
+          <h4 class="sub-card-header" style="margin-bottom: 0.5rem;">Fuzzy Columns</h4>
+          <div class="checkbox-grid">
+            {% for col in combined_column_objects %}
+            <label class="checkbox-label">
+              <input type="checkbox" name="combined_fuzzy_columns" value="{{ col.name }}" />
+              {{ col.name }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 1rem;">
+        <button type="submit" class="btn-primary">Find Combined Duplicates</button>
+      </div>
+    </form>
+
+    {% if combined_groups %}
+    <div class="results-card">
+      <div class="results-header">
+        <h4 class="results-title">Results: {{ combined_groups|length }} Combined Groups</h4>
+        <div class="results-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_to_db" />
+            <input type="hidden" name="tab" value="combined" />
+            <button type="submit" class="btn-primary">Push to Records List</button>
+          </form>
+          <a href="{% url 'export_duplicates' 'combined' %}" class="btn-black no-loader">Export to CSV</a>
+        </div>
+      </div>
+      {% for group in combined_groups %}
+      <div class="scroll-container">
+        <div class="group-title">Group #{{ group.group_id }}</div>
+        <div class="preview-html">{{ group.preview_html|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- AI DISCOVER PANEL -->
+  <div id="ai-panel" style="display: {% if active_tab == 'ai' %}block{% else %}none{% endif %};">
+    <div style="text-align: center; padding: 2rem; background: #fef2f2; border-radius: 12px; border: 1px solid var(--primary-color); margin-bottom: 2rem;">
+      <h3 style="color: var(--primary-color); margin-top: 0;">AI Smart Match Discovery</h3>
+      <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto 1.5rem;">
+        The AI engine automatically scans common fields (Item Name, Category, Location) using high-precision similarity logic to find complex duplicates.
+      </p>
+      <form method="post" onsubmit="showLoader()">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="find_ai" />
+        <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">Start AI Analysis</button>
+      </form>
+    </div>
+
+    {% if ai_groups %}
+    <div class="results-card">
+      <div class="results-header">
+        <h4 class="results-title">AI Findings: {{ ai_groups|length }} High-Confidence Groups</h4>
+        <div class="results-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_to_db" />
+            <input type="hidden" name="tab" value="ai" />
+            <button type="submit" class="btn-primary">Push AI Groups to Records List</button>
+          </form>
+          <a href="{% url 'export_duplicates' 'ai' %}" class="btn-black no-loader">Export to CSV</a>
+        </div>
+      </div>
+      {% for group in ai_groups %}
+      <div class="scroll-container" style="border-left: 2px solid var(--primary-color);">
+        <div class="group-title" style="color: var(--primary-color);">Potential Duplicate Group #{{ group.group_id }}</div>
+        <div class="preview-html">{{ group.preview_html|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- PREDICTIVE PANEL -->
+  <div id="predictive-panel" style="display: {% if active_tab == 'predictive' %}block{% else %}none{% endif %};">
+    <form method="post" onsubmit="showLoader()" class="sub-card">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="find_predictive" />
+      <h4 class="sub-card-header">Machine Learning Matching</h4>
+      <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: -0.5rem; margin-bottom: 1rem;">
+        Uses a trained ML model to predict duplicate likelihood across records.
+      </p>
+      <div class="checkbox-grid">
+        {% for col in predictive_column_objects %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="predictive_columns" value="{{ col.name }}" />
+          {{ col.name }}
+        </label>
+        {% endfor %}
+      </div>
+      <div style="margin-top: 1rem;">
+        <label class="form-label">Prediction Threshold (0.0 - 1.0)</label>
+        <input type="number" name="predictive_threshold" value="0.5" step="0.01" min="0.01" max="1.0" class="form-input" style="width: 80px;" />
+      </div>
+      <div style="margin-top: 1rem;">
+        <button type="submit" class="btn-primary">Run Predictive Match</button>
+      </div>
+    </form>
+
+    {% if predictive_groups %}
+    <div class="results-card">
+      <div class="results-header">
+        <h4 class="results-title">ML Predictions: {{ predictive_groups|length }} Groups Found</h4>
+        <div class="results-actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_to_db" />
+            <input type="hidden" name="tab" value="predictive" />
+            <button type="submit" class="btn-primary">Push to Records List</button>
+          </form>
+          <a href="{% url 'export_duplicates' 'predictive' %}" class="btn-black no-loader">Export to CSV</a>
+        </div>
+      </div>
+      {% for group in predictive_groups %}
+      <div class="scroll-container" style="border-left: 2px solid var(--primary-color);">
+        <div class="group-title" style="color: var(--primary-color);">ML Predict Group #{{ group.group_id }}</div>
+        <div class="preview-html">{{ group.preview_html|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

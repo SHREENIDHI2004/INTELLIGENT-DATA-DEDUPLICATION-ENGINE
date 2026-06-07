@@ -1,0 +1,375 @@
+{% extends 'steward/base.html' %}
+<!-- formatter-guard -->
+{% block title %}Merge Records{% endblock %}
+<!-- formatter-guard -->
+{% block content %}
+<div class="card">
+  <div style="
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    ">
+    <div>
+      <h2 class="card-header" style="margin: 0; border: none; padding: 0">
+        Merge Intelligence
+      </h2>
+      <p style="margin: 0.5rem 0 0; color: var(--text-muted)">
+        Analyzing Main Record <strong>{{ main_record.uid }}</strong> with
+        <strong>{{ candidates|length }}</strong> candidates.
+      </p>
+    </div>
+    <div style="display: flex; gap: 1rem">
+      <button type="button" onclick="autoSelectBest()" class="btn-secondary">
+        Auto-Select
+      </button>
+      <button type="button" onclick="askAIAgent()" class="btn-primary">
+        ✨ Ask AI Agent
+      </button>
+    </div>
+  </div>
+
+  <!-- AI Agent Inline Box -->
+  <div id="aiAgentBox" style="
+      display: none;
+      margin-bottom: 1.5rem;
+      background: #fef2f2;
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid var(--primary-color);
+    ">
+    <div style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--primary-color);
+        padding-bottom: 1rem;
+      ">
+      <h3 style="margin: 0; font-size: 1.25rem; color: var(--primary-color)">
+        🤖 AI Decision Engine
+      </h3>
+      <button type="button" onclick="closeAIBox()" class="btn-secondary"
+        style="font-size: 0.875rem; padding: 0.25rem 0.75rem">
+        Close
+      </button>
+    </div>
+    <div id="aiLoading" style="text-align: center; padding: 2rem">
+      <div class="spinner"></div>
+      <p style="margin-top: 1rem; color: var(--text-muted)">
+        Processing Intelligence...
+      </p>
+    </div>
+    <div id="aiContent" style="display: none">
+      <div id="aiResponse" style="line-height: 1.6; font-size: 0.875rem"></div>
+      <div style="
+          margin-top: 1rem;
+          display: flex;
+          justify-content: flex-end;
+          gap: 1rem;
+        ">
+        <button type="button" id="applyAIBtn" class="btn-primary">
+          Apply Review
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Merged Records Status (if any) -->
+  {% if merged_count and merged_count > 0 %}
+  <div style="
+      background: #f9fafb;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    ">
+    <div>
+      <h3 style="
+          margin: 0;
+          font-size: 1rem;
+          color: var(--accent-black);
+          font-weight: 700;
+        ">
+        Merged Record Information
+      </h3>
+      <p style="
+          margin: 0.25rem 0 0;
+          color: var(--text-muted);
+          font-size: 0.875rem;
+        ">
+        This record contains data from
+        <strong style="color: var(--accent-black)">{{ merged_count }}</strong>
+        merged candidates.
+      </p>
+    </div>
+    <form method="post" action="{% url 'unmerge_records' main_record.uid %}">
+      {% csrf_token %}
+      <button type="submit" class="btn-primary">Unmerge All</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <form method="post" id="mergeForm">
+    {% csrf_token %}
+    <div class="scroll-container">
+      <table class="data-table" style="min-width: 100%; width: max-content; border-collapse: collapse">
+        <thead>
+          <tr style="background: #fcfdfe">
+            <th style="width: 200px">FIELD</th>
+            <th>
+              <div style="display: flex; flex-direction: column; gap: 0.25rem">
+                <span>MAIN: {{ main_record.uid }}</span>
+                <a href="#" onclick="selectAll('main'); return false;" style="
+                    color: var(--primary-color);
+                    text-decoration: none;
+                    font-size: 0.7rem;
+                  ">Select All</a>
+              </div>
+            </th>
+            {% for cand in candidates %}
+            <th style="background: #fff1f2">
+              <div style="display: flex; flex-direction: column; gap: 0.25rem">
+                <div style="display: flex; align-items: center; gap: 0.5rem">
+                  <input type="checkbox" name="merge_candidate_uids" value="{{ cand.uid }}" checked />
+                  <span>MERGE THIS RECORD</span>
+                </div>
+                <span>CAND: {{ cand.uid }}</span>
+                <a href="#" onclick="selectAll('cand_{{ cand.uid }}'); return false;" style="
+                    color: var(--primary-color);
+                    text-decoration: none;
+                    font-size: 0.7rem;
+                  ">Select All</a>
+              </div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for field in comparison_data %}
+          <tr
+            style="{% if field.candidate_vals.0.is_match %}background: #f0fdf4;{% else %}background: #fff1f2;{% endif %}">
+            <td style="
+                font-weight: 600;
+                color: var(--text-muted);
+                font-size: 0.875rem;
+              ">
+              {{ field.name|upper }}
+            </td>
+            <td>
+              <label class="radio-label">
+                <input type="radio" name="win_{{ field.name }}" value="{{ field.main_val|default:'' }}" checked
+                  class="radio-main" data-field="{{ field.name }}" />
+                <span>{{ field.main_val|default:"-" }}</span>
+              </label>
+            </td>
+            {% for c_data in field.candidate_vals %}
+            <td>
+              <label class="radio-label">
+                <input type="radio" name="win_{{ field.name }}" value="{{ c_data.value|default:'' }}"
+                  class="radio-cand-{{ candidates.0.uid }}" data-field="{{ field.name }}" />
+                <span>{{ c_data.value|default:"-" }}</span>
+              </label>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="
+        position: sticky;
+        bottom: 0;
+        background: white;
+        padding: 1.5rem 0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        border-top: 1px solid var(--border-color);
+        margin-top: 1.5rem;
+      ">
+      <button type="submit" name="action" value="mark_reviewed" class="btn-secondary">
+        Cancel (Mark Reviewed)
+      </button>
+      <button type="submit" name="action" value="merge_separately" class="btn-secondary"
+        style="border-color: var(--primary-color); color: var(--primary-color)">
+        Merge Separately
+      </button>
+      <button type="submit" name="action" value="confirm_merge" class="btn-primary">
+        Confirm Merge
+      </button>
+    </div>
+  </form>
+</div>
+<script>
+  function selectAll(type) {
+    if (type === "main") {
+      document
+        .querySelectorAll(".radio-main")
+        .forEach((r) => (r.checked = true));
+    } else if (type.startsWith("cand_")) {
+      const uid = type.replace("cand_", "");
+      document
+        .querySelectorAll(".radio-cand-" + uid)
+        .forEach((r) => (r.checked = true));
+    }
+  }
+  function autoSelectBest() {
+    document.querySelectorAll("tbody tr").forEach((tr) => {
+      const allRadios = Array.from(tr.querySelectorAll('input[type="radio"]'));
+      if (allRadios.length === 0) return;
+      const mainRadio = allRadios.find((r) =>
+        r.classList.contains("radio-main")
+      );
+      const candRadios = allRadios.filter(
+        (r) => !r.classList.contains("radio-main")
+      );
+      let bestRadio = mainRadio;
+      let maxLength =
+        mainRadio.value && mainRadio.value !== "-" && mainRadio.value !== "None"
+          ? String(mainRadio.value).trim().length
+          : 0;
+      candRadios.forEach((r) => {
+        const val = r.value ? String(r.value).trim() : "";
+        if (val && val !== "-" && val !== "None") {
+          if (val.length > maxLength) {
+            maxLength = val.length;
+            bestRadio = r;
+          }
+        }
+      });
+      if (bestRadio) {
+        bestRadio.checked = true;
+      }
+    });
+  }
+  let aiSuggestions = null;
+  function askAIAgent() {
+    const box = document.getElementById("aiAgentBox");
+    const loading = document.getElementById("aiLoading");
+    const content = document.getElementById("aiContent");
+    const responseDiv = document.getElementById("aiResponse");
+    box.style.display = "block";
+    loading.style.display = "block";
+    content.style.display = "none";
+    fetch("{% url 'ai_agent_recommend' main_record.uid %}")
+      .then((response) => response.json())
+      .then((data) => {
+        loading.style.display = "none";
+        content.style.display = "block";
+        if (data.success) {
+          aiSuggestions = data.recommendations;
+          let html = `<p style="margin-bottom: 0.5rem;"><strong>Recommendation:</strong> <span style="background: #fee2e2; padding: 0.125rem 0.5rem; border-radius: 4px; font-weight: 700;">${data.recommendation}</span></p>`;
+          html += `<p style="margin-bottom: 0.5rem;"><strong>Reason:</strong> ${data.reason}</p>`;
+          html += `<p style="margin-bottom: 1rem;"><strong>Confidence:</strong> <span style="color: ${data.confidence === "high" ? "#059669" : "#d97706"
+            }; font-weight: 600;">${data.confidence.toUpperCase()}</span></p>`;
+          html +=
+            '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; background: rgba(255,255,255,0.5); padding: 1rem; border-radius: 8px;">';
+          for (let field in data.recommendations) {
+            html += `<div style="font-size: 0.8125rem;"><strong style="text-transform: uppercase; color: var(--primary-color); display: block; margin-bottom: 0.125rem;">${field}</strong> ${data.recommendations[field] || "-"
+              }</div>`;
+          }
+          html += "</div>";
+          responseDiv.innerHTML = html;
+          document.getElementById("applyAIBtn").onclick = function () {
+            applyAISuggestions(data);
+            closeAIBox();
+          };
+        } else {
+          responseDiv.innerHTML = `<p style="color: var(--primary-color);">Error: ${data.error}</p>`;
+          document.getElementById("applyAIBtn").style.display = "none";
+        }
+      })
+      .catch((error) => {
+        loading.style.display = "none";
+        content.style.display = "block";
+        let errorHtml = '<p style="color: var(--primary-color); font-weight: 700; font-size: 1.1rem;">AI Service Connection Failed</p>';
+        errorHtml += '<p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem;">The application could not connect to the Azure OpenAI service. Please check your internet connection and ensure the AI service endpoint and API key are configured correctly.</p>';
+        responseDiv.innerHTML = errorHtml;
+        document.getElementById("applyAIBtn").style.display = "none";
+      });
+  }
+  function applyAISuggestions(data) {
+    const suggestions = data.recommendations;
+    for (let field in suggestions) {
+      const val = suggestions[field];
+      let radios = document.querySelectorAll(`input[name="win_${field}"]`);
+      if (radios.length === 0) {
+        radios = document.querySelectorAll(`input[name="win_${field.toLowerCase()}"]`);
+        if (radios.length > 0) field = field.toLowerCase();
+      }
+
+      let found = false;
+      radios.forEach((r) => {
+        if (r.value == val) {
+          r.checked = true;
+          found = true;
+        }
+      });
+
+      if (!found && radios.length > 0) {
+        const mainRadio = document.querySelector(
+          `input[name="win_${field}"].radio-main`
+        );
+        if (mainRadio) {
+          mainRadio.value = val;
+          mainRadio.checked = true;
+          const labelSpan = mainRadio.parentElement.querySelector("span");
+          if (labelSpan) {
+            labelSpan.innerText = val + " (AI Suggested)";
+            labelSpan.style.color = "var(--primary-color)";
+            labelSpan.style.fontWeight = "600";
+          }
+        }
+      }
+    }
+
+    // New logic to populate all AI fields
+    const fieldsToUpdate = {
+      ai_recommendation: data.recommendation,
+      ai_reason: data.reason,
+      ai_confidence: data.confidence,
+      ai_suggested_values: JSON.stringify(data.recommendations),
+    };
+
+    for (let field in fieldsToUpdate) {
+      const val = fieldsToUpdate[field];
+      let radios = document.querySelectorAll(`input[name="win_${field}"]`);
+      if (radios.length === 0) {
+        radios = document.querySelectorAll(`input[name="win_${field.toLowerCase()}"]`);
+        if (radios.length > 0) field = field.toLowerCase();
+      }
+
+      let applied = false;
+      radios.forEach((radio) => {
+        if (radio.value === val) {
+          radio.checked = true;
+          applied = true;
+        }
+      });
+
+      if (!applied && radios.length > 0) {
+        const mainRadio = document.querySelector(
+          `input[name="win_${field}"].radio-main`
+        );
+        if (mainRadio) {
+          mainRadio.value = val;
+          mainRadio.checked = true;
+          const labelSpan = mainRadio.parentElement.querySelector("span");
+          if (labelSpan) {
+            labelSpan.innerText = val + " (AI Suggested)";
+            labelSpan.style.color = "var(--primary-color)";
+            labelSpan.style.fontWeight = "600";
+          }
+        }
+      }
+    }
+  }
+  function closeAIBox() {
+    document.getElementById("aiAgentBox").style.display = "none";
+  }
+</script>
+{% endblock %}

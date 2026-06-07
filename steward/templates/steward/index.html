@@ -1,0 +1,47 @@
+{% extends 'steward/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">Dashboard Overview</div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem;">
+    <div class="card">
+      <div style="font-size: 0.875rem; color: var(--text-muted);">Total Active Records</div>
+      <div class="metric-value">{{ stats.total_records }}</div>
+      <a href="{% url 'record_list' %}" style="font-size: 0.875rem; color: var(--primary-color);">View all</a>
+    </div>
+    <div class="card">
+      <div style="font-size: 0.875rem; color: var(--text-muted);">Pending Duplicates</div>
+      <div class="metric-value">{{ stats.pending_duplicates }}</div>
+      <a href="{% url 'record_list' %}?filter=pending"
+        style="font-size: 0.875rem; color: var(--primary-color);">Review Now</a>
+    </div>
+    <div class="card">
+      <div style="font-size: 0.875rem; color: var(--text-muted);">Merged Records</div>
+      <div class="metric-value">{{ stats.merged_records }}</div>
+      <a href="{% url 'record_list' %}?filter=merged"
+        style="font-size: 0.875rem; color: var(--primary-color);">View Merged</a>
+    </div>
+    <div class="card">
+      <div style="font-size: 0.875rem; color: var(--text-muted);">Loaded Data</div>
+      <div class="metric-value">{{ stats.loaded_rows|default:0 }}</div>
+      {% if stats.loaded_filename %}
+      <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">{{ stats.loaded_filename }}</span>
+      <a href="{% url 'find_duplicates' %}" style="font-size: 0.875rem; color: var(--primary-color);">Find
+        Duplicates</a>
+      {% else %}
+      <a href="{% url 'load_data' %}" style="font-size: 0.875rem; color: var(--primary-color);">Load Data</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 class="card-header">System Workflow</h3>
+  <ol style="line-height: 2; font-size: 1rem; padding-left: 1.25rem;">
+    <li><strong>Load Data</strong> — Upload CSV or Excel.</li>
+    <li><strong>Find Duplicates</strong> — Run Exact, Fuzzy, Combined, or AI Smart Match.</li>
+    <li><strong>Records List</strong> — View all records and filter pending duplicates.</li>
+    <li><strong>Review & Merge</strong> — Compare and use AI Recommendations.</li>
+  </ol>
+</div>
+{% endblock %}

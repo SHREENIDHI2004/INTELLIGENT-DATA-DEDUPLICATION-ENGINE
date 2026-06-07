@@ -1,0 +1,17 @@
+{% extends 'steward/base.html' %}
+{% block title %}Upload Master{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 32rem;">
+  <div class="card-header" style="color: var(--accent-black)">Upload Master Data</div>
+  <p style="color: var(--text-muted); margin-bottom: 1rem;">Upload Excel with columns: UID, Item_Name, Location, Category, Fuzzy_Deduplication_Candidates, etc.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-main)">Excel file (.xlsx)</label>
+    <input type="file" name="file" accept=".xlsx,.xls" required style="margin-bottom: 1rem; color: var(--text-main)">
+    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; color: var(--text-main); cursor: pointer">
+      <input type="checkbox" name="clear_existing" checked style="accent-color: var(--primary-color)"> Clear existing data before import
+    </label>
+    <button type="submit" class="btn-primary">Upload & Process</button>
+  </form>
+</div>
+{% endblock %}

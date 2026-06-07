@@ -1,0 +1,127 @@
+{% extends 'steward/base.html' %} {% block title %}Load Data{% endblock %} {% block content %}
+<div class="card">
+  <div class="card-header" style="color: var(--accent-black)">Load Data (CSV / Excel)</div>
+  <p style="color: var(--text-muted); margin-bottom: 1rem">
+    Upload a file for <strong>Find Duplicates</strong> (Exact, Fuzzy, Combined).
+    Optionally save to database for Records List workflow.
+  </p>
+  <form method="post" enctype="multipart/form-data" onsubmit="showLoader()">
+    {% csrf_token %}
+    <div style="margin-bottom: 1rem">
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-main)"
+        >File</label
+      >
+      <input
+        type="file"
+        name="file"
+        accept=".csv,.xlsx,.xls,.txt,.tsv"
+        required
+        style="margin-bottom: 1rem; color: var(--text-main)"
+      />
+    </div>
+
+    <div
+      style="
+        background: var(--background-light);
+        border: 2px solid var(--primary-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+      "
+    >
+      <label
+        style="
+          display: flex;
+          align-items: start;
+          gap: 0.5rem;
+          cursor: pointer;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <input
+          type="checkbox"
+          name="save_to_database"
+          checked
+          style="margin-top: 0.25rem; accent-color: var(--primary-color)"
+        />
+        <div>
+          <strong style="color: var(--primary-color)"
+            >✓ Save to Database (Recommended)</strong
+          >
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--text-main)">
+            <strong>Required for Records List:</strong> Check this to save
+            records to database so they appear in Records List, Review & Merge,
+            and Export. Requires columns: UID, Item_Name, Location, Category,
+            etc.
+          </p>
+          <p style="margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--text-muted)">
+            ⚠️ If unchecked, data is only available for Find Duplicates
+            (in-memory) and won't appear in Records List.
+          </p>
+        </div>
+      </label>
+
+      <label
+        style="display: flex; align-items: start; gap: 0.5rem; cursor: pointer"
+      >
+        <input
+          type="checkbox"
+          name="clear_existing"
+          style="margin-top: 0.25rem; accent-color: var(--primary-color)"
+        />
+        <div>
+          <strong style="color: var(--text-main)">Clear existing database records</strong>
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--text-muted)">
+            Delete all existing records before importing (only applies if saving
+            to database).
+          </p>
+        </div>
+      </label>
+    </div>
+
+    <button type="submit" class="btn-primary">Load Data</button>
+  </form>
+</div>
+
+{% if has_data %}
+<div class="card">
+  <div class="card-header" style="color: var(--accent-black)">Dataset overview</div>
+  <div style="display: flex; gap: 2rem; margin-bottom: 1rem">
+    <div>
+      <span style="color: var(--text-muted)">Rows</span><br /><span class="metric-value"
+        >{{ rows }}</span
+      >
+    </div>
+    <div>
+      <span style="color: var(--text-muted)">Columns</span><br /><span
+        class="metric-value"
+        >{{ columns|length }}</span
+      >
+    </div>
+    <div>
+      <span style="color: var(--text-muted)">File</span><br /><span style="color: var(--text-main)">{{ filename }}</span>
+    </div>
+  </div>
+  <p><strong style="color: var(--accent-black)">Preview</strong></p>
+  <div style="overflow-x: auto">{{ preview|safe }}</div>
+  <div style="display: flex; gap: 0.75rem; margin-top: 1rem">
+    <a
+      href="{% url 'find_duplicates' %}"
+      class="btn-primary"
+      style="text-decoration: none; display: inline-block"
+      >Go to Find Duplicates</a
+    >
+    <form method="post" style="display: inline" onsubmit="showLoader()">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="remove_current" />
+      <button
+        type="submit"
+        class="btn-primary"
+        style="background: var(--accent-black); border: none"
+      >
+        Remove Current File
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %} {% endblock %}

@@ -1,0 +1,175 @@
+{% extends 'steward/base.html' %}
+<!-- formatter-guard -->
+{% block title %}Records List{% endblock %}
+<!-- formatter-guard -->
+{% block content %}
+<div class="card">
+  <div
+    style="
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    "
+  >
+    <h2 class="card-header" style="margin: 0; border: none; padding: 0">
+      Records Repository
+    </h2>
+    <div style="display: flex; gap: 1rem; align-items: center">
+      <form method="get" style="display: flex; gap: 0.5rem; width: 300px">
+        {% if request.GET.filter %}<input
+          type="hidden"
+          name="filter"
+          value="{{ request.GET.filter }}"
+        />{% endif %} {% if request.GET.sort %}<input
+          type="hidden"
+          name="sort"
+          value="{{ request.GET.sort }}"
+        />{% endif %}
+        <input
+          type="text"
+          name="q"
+          value="{{ request.GET.q|default:'' }}"
+          placeholder="Search UID, Item..."
+          style="
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            outline-color: var(--primary-color);
+          "
+        />
+        <button type="submit" class="btn-primary">Search</button>
+      </form>
+      <div class="tabs">
+        <a
+          href="?filter=all{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}"
+          class="tab {% if request.GET.filter == 'all' or not request.GET.filter %}active{% endif %}"
+          >All</a
+        >
+        <a
+          href="?filter=pending{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}"
+          class="tab {% if request.GET.filter == 'pending' %}active{% endif %}"
+          >Pending</a
+        >
+        <a
+          href="?filter=reviewed{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}"
+          class="tab {% if request.GET.filter == 'reviewed' %}active{% endif %}"
+          >Reviewed</a
+        >
+        <a
+          href="?filter=merged{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}"
+          class="tab {% if request.GET.filter == 'merged' %}active{% endif %}"
+          >Merged</a
+        >
+      </div>
+    </div>
+  </div>
+  <div class="scroll-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          {% for c in dataset_columns %}
+          <th>
+            <div style="display: flex; align-items: center; gap: 0.5rem">
+              {{ c }} {% if c == uid_col %}
+              <div style="display: flex; flex-direction: column; gap: 2px">
+                <a
+                  href="?{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}sort=uid_desc"
+                  title="Sort Descending"
+                  style="
+                    display: block;
+                    line-height: 1;
+                    color: {% if sort_type == 'uid_desc' %}var(--primary-color){% else %}var(--text-muted){% endif %};
+                    text-decoration: none;
+                  "
+                  >▲</a
+                >
+                <a
+                  href="?{% if request.GET.filter %}filter={{ request.GET.filter }}&{% endif %}{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}sort=uid_asc"
+                  title="Sort Ascending"
+                  style="
+                    display: block;
+                    line-height: 1;
+                    color: {% if sort_type == 'uid_asc' %}var(--primary-color){% else %}var(--text-muted){% endif %};
+                    text-decoration: none;
+                  "
+                  >▼</a
+                >
+              </div>
+              {% endif %}
+            </div>
+          </th>
+          {% endfor %}
+          <th>Candidates</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          {% for cell in record.dataset_cells %}
+          <td>{{ cell|default:"-" }}</td>
+          {% endfor %}
+          <td>
+            {% if record.is_merged %}
+            <span class="badge badge-success">Merged</span>
+            {% elif record.is_reviewed %}
+            <span class="badge badge-info">Reviewed</span>
+            {% elif record.has_candidates %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem">
+              <span class="badge badge-warning">Pending Review</span>
+              <span
+                style="font-size: 0.75rem; color: var(--text-muted)"
+                title="{{ record.fuzzy_deduplication_candidates|default:'' }}"
+              >
+                {{ record.candidates_display_text }}
+              </span>
+            </div>
+            {% else %}
+            <span class="badge badge-info">Clean</span>
+            {% endif %}
+          </td>
+          <td style="text-align: right">
+            {% if record.is_reviewable %}
+            <a
+              href="{% url 'review_merge' record.uid %}"
+              style="
+                color: var(--primary-color);
+                font-weight: 600;
+                text-decoration: none;
+                font-size: 0.875rem;
+              "
+              >Review & Merge</a
+            >
+            {% else %}
+            <a
+              href="{% url 'review_merge' record.uid %}"
+              style="
+                color: var(--primary-color);
+                font-weight: 600;
+                text-decoration: none;
+                font-size: 0.875rem;
+                margin-right: 0.5rem;
+              "
+              >Details</a
+            >
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td
+            colspan="{{ recordlist_colspan }}"
+            style="text-align: center; padding: 4rem; color: #94a3b8"
+          >
+            No records found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
